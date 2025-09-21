@@ -1,0 +1,377 @@
+
+/* global box-sizing and root sizing so app fills the viewport without an inner "window" */
+* { box-sizing: border-box }
+html, body { height: 100%; margin: 0; padding: 0; }
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0; /* remove outer site padding for full-bleed */
+  text-align: center;
+}
+
+/* Ensure the page itself doesn't create an extra scrollbar; let .main handle scrolling */
+/* keep the page itself fixed and use the app main for scrolling */
+html, body, #root { min-height: 100%; margin: 0; }
+/* allow the page to scroll vertically when content exceeds the viewport */
+body { overflow-y: auto; }
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* New app layout */
+.app-root {
+  display: flex;
+  width: 100%; /* avoid 100vw which can cause horizontal overflow */
+  min-height: 100vh; /* allow content to grow beyond the initial viewport */
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+.content-grid { display: grid; grid-template-columns: 1fr 420px 260px; gap: 1.5rem; align-items: start }
+
+.main { flex:1; padding: 0.75rem; background: linear-gradient(180deg,#121212,#0b0b0b); color: #eaeaea; overflow: visible; }
+
+/* subtle site tint derived from the current track cover average color */
+#app-root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* Increased alpha for a more noticeable but still subtle tint */
+  background: linear-gradient(180deg, rgba(var(--tint-rgb, 29,185,84), 0.6), rgba(0,0,0,0));
+}
+.main-header h1 { margin: 0 0 0.25rem 0 }
+.main-header { transition: color 240ms ease }
+.main-header h1, .main-header p { color: var(--tint-text, #ffffff) }
+.content-grid { display: grid; grid-template-columns: 28% 1fr 220px; gap: 1rem; align-items: start }
+
+.capture-card, .player-card, .history-card { position: relative; background: #181818; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.6); overflow: hidden }
+
+.capture-card { max-width: 28vw }
+
+.webcam-capture { display:flex; flex-direction:column; gap:0.5rem; align-items:center }
+.webcam-video { background: #000; width:100%; max-width: 100%; border-radius:6px; aspect-ratio: 16 / 9; max-height: 30vh; height: auto; }
+
+/* Ensure the webcam container keeps a consistent aspect ratio on small screens */
+.webcam-capture { display:flex; flex-direction:column; gap:0.5rem; align-items:center }
+
+@media (max-width: 900px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .history-card, .debug-card { order: 3 }
+  .player-card { order: 2 }
+  .capture-card { order: 1 }
+}
+.controls { display:flex; gap:0.5rem; }
+.capture-btn { background: #1db954; color: #fff; border: none; padding: 0.6rem 1rem; border-radius: 20px; cursor: pointer }
+.capture-btn:disabled { opacity: 0.6; cursor: not-allowed }
+
+/* make the capture button match the play button gradient */
+.capture-btn { background: linear-gradient(90deg,#1db954,#61dafb); color: #022; font-weight:700; padding: 0.6rem 1.1rem; border-radius: 22px; box-shadow: 0 6px 18px rgba(0,0,0,0.4) }
+
+
+.overlay { position: absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; color: #fff }
+.error { color: #ff6b6b }
+
+.player { display:flex; flex-direction:column; gap:1rem }
+.track-info { display:flex; gap:1rem; align-items:center }
+.cover { width:72px; height:72px; background:linear-gradient(135deg,#333,#111); border-radius:6px }
+.track-title { font-weight:600 }
+.track-artist { color:#b3b3b3; font-size:0.9rem }
+/* Cover image when artwork is available */
+.cover {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.meta-col { display:flex; flex-direction:column }
+.track-album { color:#9aa3a3; font-size:0.85rem; margin-top:4px }
+
+/* Loading bar */
+.progress-container { margin-bottom: 0.5rem }
+.progress-bar { position: relative; width: 100%; height: 8px; background: rgba(255,255,255,0.04); border-radius: 4px; overflow: hidden }
+.buffered-fill { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,0.12); z-index: 1 }
+.played-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg,#1db954,#61dafb); z-index: 2 }
+
+/* small fallback for very old browsers */
+.loading-text { font-size:0.85rem; color:#bdbdbd }
+
+/* Upload overlay + spinner */
+.upload-overlay { position: absolute; inset: 0; display:flex; flex-direction:column; gap:0.5rem; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); border-radius: 8px; color: #fff }
+.spinner { width:48px; height:48px; border-radius:50%; border:6px solid rgba(255,255,255,0.12); border-top-color: #1db954; animation: spin 1s linear infinite }
+.upload-text { font-size:0.95rem }
+
+/* subtle fade for changing upload messages */
+.upload-text { transition: opacity 300ms ease; opacity: 1 }
+.upload-text.fade-out { opacity: 0 }
+
+/* Typewriter caret and monospace feel for upload messages */
+.upload-text.typewriter { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace; letter-spacing: 0.02em }
+.upload-text.typewriter::after {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 1.05em;
+  margin-left: 6px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0) 60%);
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 49% { opacity: 1 }
+  50%, 100% { opacity: 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-text.typewriter::after { animation: none; opacity: 1 }
+}
+
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* Time row */
+.time-row { display:flex; justify-content:space-between; margin-top:6px; color:#bdbdbd; font-size:0.85rem }
+.time-elapsed, .time-duration { width: 48px; text-align: center }
+
+.controls-row { display:flex; align-items:center; gap:12px; margin-top:12px }
+.controls-row.centered { justify-content: center }
+.play-btn { background: linear-gradient(90deg,#1db954,#61dafb); border:none; color:#022; font-weight:700; width:48px; height:48px; border-radius:999px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 6px 18px rgba(0,0,0,0.5); transition: transform 120ms ease, box-shadow 120ms ease; padding: 4px }
+.play-btn.playing { transform: scale(1.05); }
+.play-btn:active { transform: scale(0.96); box-shadow: 0 4px 10px rgba(0,0,0,0.4) }
+.play-btn.playing::after {
+  content: '';
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(rgba(34,139,230,0.12), rgba(34,139,230,0));
+  animation: pulse 1400ms infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.9 }
+  70% { transform: translate(-50%, -50%) scale(1.12); opacity: 0.02 }
+  100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0 }
+}
+/* Prev/Next button styles (moved out of keyframes) */
+.small-btn.prev-btn, .small-btn.next-btn {
+  width: auto;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: none;
+}
+.small-btn.prev-btn:hover, .small-btn.next-btn:hover { transform: none }
+.small-btn.prev-btn:active, .small-btn.next-btn:active { transform: none }
+.small-btn.prev-btn[disabled], .small-btn.next-btn[disabled] { opacity: 0.45; cursor: default }
+.player-controls-spacer { flex:1 }
+
+/* Reference-style player layout */
+.player-ref { padding: 1rem; display:flex; flex-direction:column; gap:12px; border-radius: inherit; position: relative; overflow: hidden }
+.player-inner { position: relative; z-index: 2; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius: inherit; padding: 1rem; backdrop-filter: none }
+.player-blur { position: absolute; inset: 0; z-index: 1; background-size: cover; background-position: center; filter: blur(18px) saturate(120%); opacity: 0.12; border-radius: inherit; transition: opacity 300ms ease, transform 600ms cubic-bezier(.2,.9,.2,1); pointer-events: none; will-change: transform, opacity }
+.player-blur.playing { opacity: 0.22; transform: scale(1.02) }
+.player-overlay { position:absolute; inset:0; z-index:1; pointer-events:none; background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.35)); border-radius:inherit }
+.player-top { display:flex; gap:12px; align-items:center; flex-direction:column; justify-content:center }
+.player-art { width:220px; height:220px; background: linear-gradient(135deg,#333,#111); border-radius:8px; background-size:cover; background-position:center; box-shadow: 0 8px 20px rgba(0,0,0,0.6) }
+.player-meta { flex:1; text-align:center; margin-top: 6px }
+.player-title { font-size:1.6rem; font-weight:800 }
+.player-artist { color:#bdbdbd; font-size:1rem; margin-top:4px }
+.player-album { color:#9aa3a3; font-size:0.95rem }
+
+.player-center { display:flex; justify-content:center; align-items:center }
+.center-controls { display:flex; gap:32px; align-items:center; justify-content:center; padding: 8px 0; }
+.small-btn { background: transparent; color:#cfcfcf; border: none; font-size:20px; cursor: pointer }
+.small-btn.prev-btn, .small-btn.next-btn {
+  width: 50px;
+  height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(40,40,40,0.95));
+  box-shadow: 0 6px 14px rgba(0,0,0,0.6);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.small-btn.prev-btn svg, .small-btn.next-btn svg { display: block; width: 72%; height: 72%; }
+.small-btn.prev-btn:hover, .small-btn.next-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.6) }
+.small-btn.prev-btn:active, .small-btn.next-btn:active { transform: translateY(0); box-shadow: 0 6px 12px rgba(0,0,0,0.5) }
+.small-btn.prev-btn[disabled], .small-btn.next-btn[disabled] { opacity: 0.45; cursor: default; transform: none }
+.play-btn.large { width:48px; height:48px; padding:4px; box-shadow: 0 6px 14px rgba(0,0,0,0.45) }
+
+.player-bottom { display:flex; flex-direction:column; gap:8px }
+.progress-row { display:flex; align-items:center; gap:12px }
+.progress-wrapper { flex:1 }
+.time-left, .time-right { width:48px; color:#bdbdbd; font-size:0.95rem }
+.progress-bar { position: relative; width:100%; height:10px; background: rgba(255,255,255,0.06); border-radius:999px; overflow:hidden }
+.played-fill { position:absolute; left:0; top:0; bottom:0; background: linear-gradient(90deg,#1db954,#61dafb); z-index:2 }
+.buffered-fill { position:absolute; left:0; top:0; bottom:0; background: rgba(255,255,255,0.12); z-index:1 }
+.seek-thumb { position:absolute; top:50%; transform: translate(-50%,-50%); width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 3px 8px rgba(0,0,0,0.5); }
+
+.bottom-controls { display:flex; justify-content:flex-end; align-items:center }
+.volume-block { display:flex; gap:12px; align-items:center }
+
+/* seek thumb */
+.progress-bar { position: relative; height: 8px }
+.seek-thumb { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer }
+.seek-thumb:active { transform: translate(-50%, -50%) scale(0.95) }
+
+.debug-card { margin-top: 1rem; background: #0f0f0f; padding: 0.75rem; border-radius: 6px; color: #dcdcdc }
+.debug-pre { max-height: 120px; overflow:auto; background: #0b0b0b; padding: 0.5rem; border-radius:4px; color:#9fd9b6 }
+.debug-card a { color: #8be28b; word-break: break-all }
+
+.history-card h3 { margin-top: 0; margin-bottom: 0.5rem }
+.history-list { list-style: none; margin: 0; padding: 0; display:flex; flex-direction:column; gap:8px }
+.history-item { display:flex; gap:8px; align-items:center; cursor:pointer; padding:6px; border-radius:6px }
+.history-item:hover { background: rgba(255,255,255,0.02) }
+.history-cover { width:44px; height:44px; background: linear-gradient(135deg,#333,#111); border-radius:6px; background-size:cover; background-position:center }
+.history-title { font-size:0.95rem; font-weight:600 }
+.history-artist { font-size:0.85rem; color:#bdbdbd }
+.history-empty { color:#9aa3a3; font-size:0.95rem }
+
+/* Volume button / mute fixes: ensure icon contrasts and clickable area */
+.mute-btn { background: transparent; border: none; color: #eaeaea; padding: 6px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow: visible; position: relative; z-index: 2 }
+.mute-btn:active { transform: scale(0.96) }
+.volume-slider { width:120px }
+
+/* Ensure the SVG inside the mute button isn't clipped */
+.mute-btn svg { display: block; width: 22px; height: 22px }
+
+/* Gradient volume slider to match the play/pause button */
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06); /* neutral track; inline style will show the gradient fill */
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+  outline: none;
+  position: relative;
+  z-index: 0;
+}
+
+/* WebKit track/thumb */
+.volume-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: transparent;
+}
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  margin-top: -3px; /* center the thumb vertically */
+  cursor: pointer;
+}
+
+/* Firefox */
+.volume-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: transparent;
+}
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  border: none;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .sidebar { display:none }
+}
+
+/* Temporary override: force prev/next to show as plain white icons (no bubble) */
+.small-btn.prev-btn, .small-btn.next-btn {
+  background: transparent !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+.small-btn.prev-btn svg, .small-btn.next-btn svg {
+  width: 84% !important;
+  height: 84% !important;
+}
+.small-btn.prev-btn svg path, .small-btn.next-btn svg path {
+  fill: #ffffff !important;
+  stroke: none !important;
+}
+
+/* Boxed buttons for queue actions */
+.boxed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(180deg, rgba(30,30,30,0.95), rgba(45,45,45,0.95));
+  border-radius: 10px;
+  border: none;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  padding: 6px;
+}
+.boxed-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,0.6) }
+.boxed-btn:active { transform: translateY(0); box-shadow: 0 6px 12px rgba(0,0,0,0.45) }
+.boxed-btn svg { width: 22px; height: 22px; display:block }
+
+/* make the queue-only cover a bit larger and square to emphasize the queued single item */
+.queue-only-cover { width:56px; height:56px; border-radius:8px }
+
+/* align the queue-item so the cover stays on the left and action buttons are right-aligned with even spacing */
+.queue-item { justify-content: space-between; }
+.queue-item .action-group { display:flex; gap:12px; align-items:center; }
+.queue-item .action-group .boxed-btn { width:56px; height:56px; border-radius:12px }
+/* Nudge the first boxed button (play) slightly to the right for visual offset */
+.queue-item .action-group .boxed-btn:first-child { margin-left: 8px }
