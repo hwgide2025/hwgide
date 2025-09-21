@@ -23,3 +23,5 @@ Python, React, JS, git, CSS
 #### Why a bunch of code was just added after this
 So I never added the backend to the GitHub repo, and so I am adding it right after this is commited.
 
+Also if the front end looks weird, then this might be the out of date version of it, check my repos for the other verison.  THis change was required to hard reset a broken Netlify project.
+
