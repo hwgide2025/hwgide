@@ -30,3 +30,11 @@ dist-ssr
 
 # Backend testing venv
 venv
+songs
+songs.db
+
+
+.Identifier
+.Zone.Identifier
+.Zone
+.env:Zone.Identifier
