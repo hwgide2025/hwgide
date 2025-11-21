@@ -28,6 +28,17 @@ const WebcamCapture = forwardRef(function WebcamCapture({ onCapture, disabled, m
     }
   }, [])
 
+  // Freeze/unfreeze the live video when `disabled` changes (used for loading overlay)
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (disabled) {
+      try { v.pause() } catch (e) { /* ignore */ }
+    } else {
+      try { v.play().catch(() => {}) } catch (e) { /* ignore */ }
+    }
+  }, [disabled])
+
   async function capture() {
     if (!videoRef.current) return
     const video = videoRef.current
