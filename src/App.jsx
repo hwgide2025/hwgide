@@ -221,8 +221,8 @@ function App() {
         try {
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', '29,185,84')
-          // darker variant for header background (default)
-          root?.style.setProperty('--tint-rgb-dark', '18,115,50')
+          // brighter variant for header background (default)
+          root?.style.setProperty('--tint-rgb-dark', '60,160,100')
           // darker text color derived from the background (default)
           root?.style.setProperty('--text-rgb-dark', '9,65,22')
           root?.style.setProperty('--tint-text-dark', '#092f16')
@@ -350,11 +350,17 @@ function App() {
             const finalG = clamp(comp2G)
             const finalB = clamp(comp2B)
 
-            root?.style.setProperty('--tint-rgb-dark', `${finalR}, ${finalG}, ${finalB}`)
-            // also set a darker text color (hex) based on final
+            // brighten the computed dark variant slightly so header gradients are less black
+            const brighten = (v) => Math.max(0, Math.min(255, Math.round(v + (255 - v) * 0.18)))
+            const brightR = brighten(finalR)
+            const brightG = brighten(finalG)
+            const brightB = brighten(finalB)
+
+            root?.style.setProperty('--tint-rgb-dark', `${brightR}, ${brightG}, ${brightB}`)
+            // also set a slightly brighter text color (hex) based on brightened final
             const toHex = (n) => n.toString(16).padStart(2, '0')
-            root?.style.setProperty('--tint-text-dark', `#${toHex(finalR)}${toHex(finalG)}${toHex(finalB)}`)
-            root?.style.setProperty('--text-rgb-dark', `${finalR}, ${finalG}, ${finalB}`)
+            root?.style.setProperty('--tint-text-dark', `#${toHex(brightR)}${toHex(brightG)}${toHex(brightB)}`)
+            root?.style.setProperty('--text-rgb-dark', `${brightR}, ${brightG}, ${brightB}`)
           } catch (e) {
             // ignore
           }
@@ -367,7 +373,7 @@ function App() {
         try {
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', '29,185,84')
-          root?.style.setProperty('--tint-rgb-dark', '18,115,50')
+          root?.style.setProperty('--tint-rgb-dark', '60,160,100')
           root?.style.setProperty('--text-rgb-dark', '9,65,22')
           root?.style.setProperty('--tint-text-dark', '#092f16')
           const r0 = 29, g0 = 185, b0 = 84

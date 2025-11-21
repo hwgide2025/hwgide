@@ -132,13 +132,13 @@ body { overflow-y: auto; }
   /* base dark site gradient + subtle tint derived from current track cover */
   /* Use the already-composited tint color directly to avoid double-overlaying */
   background: 
-    linear-gradient(180deg, rgba(var(--tint-rgb-dark,29,115,50),1), rgba(0,0,0,0.75)),
+    linear-gradient(180deg, rgba(var(--tint-rgb-dark,60,160,100),1), rgba(0,0,0,0.75)),
     linear-gradient(180deg,#0b0b0b,#000000);
   padding: 0.75rem 0.9rem;
   border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.04);
+  border: none;
   /* stronger drop shadow for more separation; subtle tint glow using --tint-rgb */
-  box-shadow: 0 18px 56px rgba(0,0,0,0.75), 0 6px 18px rgba(var(--tint-rgb-dark,29,115,50),0.12);
+  box-shadow: 0 18px 56px rgba(0,0,0,0.75), 0 6px 18px rgba(var(--tint-rgb-dark,60,160,100),0.12);
   text-align: center;
 }
 .capture-column .main-header h1 { margin: 0; font-size: 2.4rem; opacity: 0.51; }
@@ -463,6 +463,10 @@ body { overflow-y: auto; }
 .capture-column .main-header {
   position: relative; /* container for the pseudo-element */
   overflow: hidden;
+  /* stronger outer shadow with a subtle inset so the header sits above the surface
+     without a hard border. This preserves separation after removing the border. */
+  box-shadow: 0 18px 48px rgba(0,0,0,0.56), 0 6px 16px rgba(var(--tint-rgb-dark,60,160,100),0.08), inset 0 -6px 12px rgba(0,0,0,0.18);
+  border-radius: 10px;
 }
 .capture-column .main-header::before {
   content: '';
@@ -470,18 +474,25 @@ body { overflow-y: auto; }
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* Use a gradient based on the computed average color (--tint-rgb) and a darker
-     derived variant (--tint-rgb-dark). This produces a smooth header background
-     inspired by the player's blurred artwork without rendering the image itself. */
-  background-image: linear-gradient(180deg, rgba(var(--tint-rgb, 29,185,84), 0.95), rgba(var(--tint-rgb-dark, 18,115,50), 0.95));
+  /* Smoother gradient: include intermediate stops so the transition between
+     the average color and its darker variant is gradual rather than abrupt. */
+  background-image: linear-gradient(180deg,
+    rgba(var(--tint-rgb-dark, 29,185,84), 0.98) 0%,
+    rgba(var(--tint-rgb-dark, 29,185,84), 0.86) 40%,
+    rgba(var(--tint-rgb-dark, 29,185,84), 0.70) 80%,
+    /* rgba(var(--tint-rgb-dark, 60,160,100), 0.10) 98%, */
+    rgba(var(--tint-rgb-dark, 60,160,100), 0.70) 100%
+  );
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  /* slight scale for a subtle soft-edge feel */
-  transform: scale(1.03);
-  /* visible but slightly dimmed so text remains readable */
-  opacity: 0.9;
-  transition: opacity 260ms ease, transform 360ms cubic-bezier(.2,.9,.2,1);
+  /* normal blend to avoid darkening; subtle blur to echo the player's blurred background */
+  background-blend-mode: normal;
+  filter: blur(6px) saturate(110%);
+  transform: scale(1.02);
+  /* lower opacity so the header overlay mixes with the underlying card base */
+  opacity: 0.6;
+  transition: opacity 260ms ease, transform 360ms cubic-bezier(.2,.9,.2,1), filter 360ms ease;
 }
 /* Ensure header content sits above the background pseudo-element */
 .capture-column .main-header > * {
