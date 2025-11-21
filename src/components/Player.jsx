@@ -1,7 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { PlayIcon, PauseIcon, VolumeIcon, MuteIcon, PrevIcon, NextIcon } from './Icons'
 
-const Player = forwardRef(function Player({ src, title, artist, album, cover, loading = false, onCanPlay, onError, onPlay, onPause, onEnded, history = [], onPlayPrevious, onPlayNext }, ref) {
+const Player = forwardRef(function Player({ src, title, artist, album, cover, loading = false, onCanPlay, onError, onPlay, onPause, onEnded, history = [], onPlayPrevious, onPlayNext, onCoverChange }, ref) {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -34,6 +34,15 @@ const Player = forwardRef(function Player({ src, title, artist, album, cover, lo
     a.volume = volume
     a.muted = muted
   }, [volume, muted])
+
+  // Notify parent when the cover prop changes
+  useEffect(() => {
+    try {
+      if (onCoverChange) onCoverChange(cover)
+    } catch (e) {
+      // ignore
+    }
+  }, [cover])
 
   function handleLoadedMetadata() {
     const a = audioRef.current

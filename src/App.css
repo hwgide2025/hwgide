@@ -121,8 +121,30 @@ body { overflow-y: auto; }
 }
 .main-header h1 { margin: 0 0 0.25rem 0 }
 .main-header { transition: color 240ms ease }
-.main-header h1, .main-header p { color: var(--tint-text, #ffffff) }
+.main-header h1, .main-header p, .main-header h2 { color: var(--tint-text, #ffffff) }
 .content-grid { display: grid; grid-template-columns: 28% 1fr 220px; gap: 1rem; align-items: start }
+
+/* Column wrapper for header + capture card so header sits above the capture area */
+.capture-column { display:flex; flex-direction:column; gap:0.75rem }
+
+/* Boxed background for the main header when placed above the capture card */
+.capture-column .main-header {
+  /* base dark site gradient + subtle tint derived from current track cover */
+  /* Use the already-composited tint color directly to avoid double-overlaying */
+  background: 
+    linear-gradient(180deg, rgba(var(--tint-rgb-dark,29,115,50),1), rgba(0,0,0,0.75)),
+    linear-gradient(180deg,#0b0b0b,#000000);
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.04);
+  /* stronger drop shadow for more separation; subtle tint glow using --tint-rgb */
+  box-shadow: 0 18px 56px rgba(0,0,0,0.75), 0 6px 18px rgba(var(--tint-rgb-dark,29,115,50),0.12);
+  text-align: center;
+}
+.capture-column .main-header h1 { margin: 0; font-size: 2.4rem; opacity: 0.51; }
+.capture-column .main-header p { margin: 0; opacity: 0.5 }
+.capture-column .main-header h2 { margin: 0; opacity: 0.5 }
+.capture-column .main-header h2 { margin: 0.25rem 0 0 0; font-size: 1rem; font-weight: 600 }
 
 .capture-card, .player-card, .history-card { position: relative; background: #181818; padding: 1rem; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.6); overflow: hidden }
 
@@ -433,3 +455,39 @@ body { overflow-y: auto; }
 .queue-item .action-group .boxed-btn { width:56px; height:56px; border-radius:12px }
 /* Nudge the first boxed button (play) slightly to the right for visual offset */
 .queue-item .action-group .boxed-btn:first-child { margin-left: 8px }
+
+/* Blurred background for the main header that samples the player's blurred cover.
+   Uses --player-cover-url (set from JS) when available; otherwise the header keeps
+   its tint-based gradient. The pseudo-element is blurred and dimmed to match
+   the player's blurred background look. */
+.capture-column .main-header {
+  position: relative; /* container for the pseudo-element */
+  overflow: hidden;
+}
+.capture-column .main-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Use a gradient based on the computed average color (--tint-rgb) and a darker
+     derived variant (--tint-rgb-dark). This produces a smooth header background
+     inspired by the player's blurred artwork without rendering the image itself. */
+  background-image: linear-gradient(180deg, rgba(var(--tint-rgb, 29,185,84), 0.95), rgba(var(--tint-rgb-dark, 18,115,50), 0.95));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* slight scale for a subtle soft-edge feel */
+  transform: scale(1.03);
+  /* visible but slightly dimmed so text remains readable */
+  opacity: 0.9;
+  transition: opacity 260ms ease, transform 360ms cubic-bezier(.2,.9,.2,1);
+}
+/* Ensure header content sits above the background pseudo-element */
+.capture-column .main-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* If no player cover is set, keep slightly stronger tint overlay to maintain contrast */
+/* end header blur rules */

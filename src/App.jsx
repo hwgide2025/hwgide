@@ -202,11 +202,32 @@ function App() {
   useEffect(() => {
     let cancelled = false
     async function computeAndSet() {
-      const url = trackInfo?.cover
+      // Prefer the player's blurred background image if available, otherwise fall back to track cover
+      let url = null
+      try {
+        const playerBlur = document.querySelector('.player-blur')
+        if (playerBlur) {
+          const bg = window.getComputedStyle(playerBlur).backgroundImage || ''
+          // backgroundImage is like: url("https://...")
+          const m = bg.match(/url\(["']?(.*?)["']?\)/)
+          if (m && m[1]) url = m[1]
+        }
+      } catch (e) {
+        // ignore and fall back
+      }
+      if (!url) url = trackInfo?.cover
+
       if (!url) {
         try {
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', '29,185,84')
+          // darker variant for header background (default)
+          root?.style.setProperty('--tint-rgb-dark', '18,115,50')
+          // darker text color derived from the background (default)
+          root?.style.setProperty('--text-rgb-dark', '9,65,22')
+          root?.style.setProperty('--tint-text-dark', '#092f16')
+          // indicate there's no player cover available so CSS falls back to tint-only
+          root?.style.setProperty('--player-cover-url', 'none')
           const r0 = 29, g0 = 185, b0 = 84
           const lum0 = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
           root?.style.setProperty('--tint-text', lum0 > 150 ? '#0b0b0b' : '#ffffff')
@@ -244,6 +265,99 @@ function App() {
           b = Math.round(b / count)
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', `${r}, ${g}, ${b}`)
+          // set the cover/blur URL as a CSS variable so CSS can use it for header background
+          try { root?.style.setProperty('--player-cover-url', `url("${url}")`) } catch (e) {}
+          // compute a darker variant for header backgrounds by simulating the player composition
+          try {
+            // helper: clamp
+            const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)))
+
+            // get computed styles for player elements
+            const blurEl = document.querySelector('.player-blur')
+            const overlayEl = document.querySelector('.player-overlay')
+            const playerInnerEl = document.querySelector('.player-inner')
+
+            // defaults
+            let blurOpacity = 1
+            let overlayAlpha = 0.45 // default from CSS
+            let overlayIsBlack = true
+            let baseR = 0, baseG = 0, baseB = 0
+
+            try {
+              if (blurEl) {
+                const s = window.getComputedStyle(blurEl)
+                blurOpacity = parseFloat(s.opacity || '1') || 1
+              }
+            } catch (e) {}
+
+            try {
+              if (overlayEl) {
+                const s = window.getComputedStyle(overlayEl)
+                // overlay background may be a gradient; try to parse rgba occurrences
+                const bg = s.backgroundImage || s.background || ''
+                const rgbaMatches = Array.from(bg.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/g))
+                if (rgbaMatches.length > 0) {
+                  // take the first match's alpha if present, otherwise 1
+                  const m = rgbaMatches[0]
+                  overlayAlpha = parseFloat(m[4] || '1') || overlayAlpha
+                  overlayIsBlack = (parseInt(m[1]) === 0 && parseInt(m[2]) === 0 && parseInt(m[3]) === 0)
+                }
+              }
+            } catch (e) {}
+
+            try {
+              if (playerInnerEl) {
+                const s = window.getComputedStyle(playerInnerEl)
+                // try read backgroundColor as fallback base; if transparent, leave base as black
+                const bc = s.backgroundColor || ''
+                const m = bc.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/)
+                if (m) {
+                  baseR = parseInt(m[1]) || 0
+                  baseG = parseInt(m[2]) || 0
+                  baseB = parseInt(m[3]) || 0
+                }
+              }
+            } catch (e) {}
+
+            // step 1: composite the blurred image (avg color) over base using blurOpacity
+            // image color is r,g,b
+            const imgAlpha = blurOpacity
+            const comp1R = imgAlpha * r + (1 - imgAlpha) * baseR
+            const comp1G = imgAlpha * g + (1 - imgAlpha) * baseG
+            const comp1B = imgAlpha * b + (1 - imgAlpha) * baseB
+
+            // step 2: composite overlay (assumed black or rgba) over comp1 using overlayAlpha
+            let overR = 0, overG = 0, overB = 0
+            if (!overlayIsBlack) {
+              // if overlay wasn't black, try to parse a color; otherwise we leave as black
+              try {
+                const s = window.getComputedStyle(overlayEl)
+                const bg = s.backgroundImage || s.background || ''
+                const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/)
+                if (m) {
+                  overR = parseInt(m[1]) || 0
+                  overG = parseInt(m[2]) || 0
+                  overB = parseInt(m[3]) || 0
+                }
+              } catch (e) {}
+            }
+
+            const comp2R = overlayAlpha * overR + (1 - overlayAlpha) * comp1R
+            const comp2G = overlayAlpha * overG + (1 - overlayAlpha) * comp1G
+            const comp2B = overlayAlpha * overB + (1 - overlayAlpha) * comp1B
+
+            const finalR = clamp(comp2R)
+            const finalG = clamp(comp2G)
+            const finalB = clamp(comp2B)
+
+            root?.style.setProperty('--tint-rgb-dark', `${finalR}, ${finalG}, ${finalB}`)
+            // also set a darker text color (hex) based on final
+            const toHex = (n) => n.toString(16).padStart(2, '0')
+            root?.style.setProperty('--tint-text-dark', `#${toHex(finalR)}${toHex(finalG)}${toHex(finalB)}`)
+            root?.style.setProperty('--text-rgb-dark', `${finalR}, ${finalG}, ${finalB}`)
+          } catch (e) {
+            // ignore
+          }
           // set readable header text color based on luminance
           const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
           root?.style.setProperty('--tint-text', lum > 150 ? '#0b0b0b' : '#ffffff')
@@ -253,6 +367,9 @@ function App() {
         try {
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', '29,185,84')
+          root?.style.setProperty('--tint-rgb-dark', '18,115,50')
+          root?.style.setProperty('--text-rgb-dark', '9,65,22')
+          root?.style.setProperty('--tint-text-dark', '#092f16')
           const r0 = 29, g0 = 185, b0 = 84
           const lum0 = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
           root?.style.setProperty('--tint-text', lum0 > 150 ? '#0b0b0b' : '#ffffff')
@@ -260,7 +377,27 @@ function App() {
       }
     }
     computeAndSet()
-    return () => { cancelled = true }
+
+    // Observe player blur / overlay for style changes (backgroundImage, opacity) and recompute when they change.
+    const obs = new MutationObserver((mutationsList) => {
+      // debounce to avoid thrashing
+      if (computeAndSet._timer) clearTimeout(computeAndSet._timer)
+      computeAndSet._timer = setTimeout(() => { if (!cancelled) computeAndSet() }, 80)
+    })
+    try {
+      const blurEl = document.querySelector('.player-blur')
+      const overlayEl = document.querySelector('.player-overlay')
+      if (blurEl) obs.observe(blurEl, { attributes: true, attributeFilter: ['style', 'class'] })
+      if (overlayEl) obs.observe(overlayEl, { attributes: true, attributeFilter: ['style', 'class', 'background'] })
+    } catch (e) {
+      // ignore observer errors in some environments
+    }
+
+    return () => {
+      cancelled = true
+      try { obs.disconnect() } catch (e) {}
+      if (computeAndSet._timer) clearTimeout(computeAndSet._timer)
+    }
   }, [trackInfo && trackInfo.cover])
 
   async function fetchAndUseBlob(url) {
@@ -441,6 +578,19 @@ function App() {
     return () => { mounted = false; clearInterval(id) }
   }, [audioSrc])
 
+  // Handler called by Player when its cover changes
+  function handlePlayerCoverChange(coverUrl) {
+    try {
+      if (!coverUrl) return
+      setTrackInfo(current => {
+        if (current && current.cover === coverUrl) return current
+        return { ...(current || {}), cover: coverUrl }
+      })
+    } catch (e) {
+      // ignore
+    }
+  }
+
   return (
     <div id="app-root" className="app-root">
       {(() => {
@@ -466,16 +616,15 @@ function App() {
         )
       })()}
       <main className="main">
-        <header className="main-header">
-          <h1>Módify</h1>
-          <p style={{ margin: 0, padding: 0, opacity: 0.2, fontSize: 12 }}>Pronounced Moodify</p>
-          <h2 style={{ marginTop: 0 }}>Music from your Mood</h2>
-          {/* <p>Take a photo, get a song</p> */}
-        </header>
-        
         <section className="content-grid">
-          <div className="capture-card">
-            <WebcamCapture ref={webcamRef} onCapture={handleCapture} disabled={loading} mood={mood} />
+          <div className="capture-column">
+            <header className="main-header">
+              <h1>Módify</h1>
+              <p style={{ margin: 0, padding: 0, opacity: 0.4, fontSize: 12 }}>Pronounced Moodify</p>
+              <h2 style={{ marginTop: 0 }}>Music from your Mood</h2>
+            </header>
+            <div className="capture-card">
+              <WebcamCapture ref={webcamRef} onCapture={handleCapture} disabled={loading} mood={mood} />
             {loading && (
               <div className="overlay upload-overlay">
                 <div className="spinner" />
@@ -483,6 +632,8 @@ function App() {
               </div>
             )}
             {error && <div className="error">{error}</div>}
+          </div>
+
           </div>
 
           <div className="player-card">
@@ -532,6 +683,7 @@ function App() {
                   setTimeout(() => playerRef.current?.play(), 120)
                 }
               }}
+              onCoverChange={handlePlayerCoverChange}
             />
           </div>
 
