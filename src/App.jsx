@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
+import pkg from '../package.json'
 import './App.css'
 import Player from './components/Player'
 import { PlayIcon, RemoveIcon } from './components/Icons'
 import WebcamCapture from './components/WebcamCapture'
+import buildInfo from './buildInfo'
 import { sendImageToApi } from './api'
 
 function App() {
@@ -16,8 +18,10 @@ function App() {
   const [lastApiResponse, setLastApiResponse] = useState(null)
   const [audioError, setAudioError] = useState(null)
   const [error, setError] = useState(null)
+  const [mood, setMood] = useState(null)
   const playerRef = useRef()
   const prevObjectUrl = useRef(null)
+  const [showBuildTooltip, setShowBuildTooltip] = useState(false)
   // Simple FIFO queue for upcoming tracks (state + ref so UI updates reliably)
   const queueRef = useRef([])
   const [queue, setQueue] = useState([])
@@ -91,6 +95,38 @@ function App() {
 
   // Track whether the queued demo was added; set false so the default/demo track will autoplay when ready
   const demoQueuedRef = useRef(false)
+
+  function formatBuildTimestamp(ts) {
+    if (!ts) return ''
+    try {
+      // Format the timestamp in the user's local time with timezone abbreviation.
+      const d = new Date(ts)
+      // Use Intl.DateTimeFormat to obtain localized parts including timezone short name (e.g. EST)
+      const parts = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZoneName: 'short'
+      }).formatToParts(d)
+
+      const lookup = {}
+      for (const p of parts) {
+        if (p.type && p.value) lookup[p.type] = p.value
+      }
+
+      // parts provide month/day/year in locale order; ensure we build YYYY-MM-DD
+      const year = lookup.year || d.getFullYear()
+      const month = lookup.month || String(d.getMonth() + 1).padStart(2, '0')
+      const day = lookup.day || String(d.getDate()).padStart(2, '0')
+      // hour/minute are already zero-padded due to options
+      const hour = lookup.hour || String(d.getHours()).padStart(2, '0')
+      const minute = lookup.minute || String(d.getMinutes()).padStart(2, '0')
+      const tz = lookup.timeZoneName || ''
+
+      return `${month}-${day}-${year} ${hour}:${minute} ${tz}`.trim()
+    } catch (e) {
+      return ts
+    }
+  }
 
   const loaderMessages = [
     'Uploading photo…',
@@ -253,6 +289,8 @@ function App() {
 
   async function handleCapture(blob) {
     setError(null)
+    setError(null)
+    setMood(null)
     setLoading(true)
     try {
       const res = await sendImageToApi(blob)
@@ -262,6 +300,8 @@ function App() {
         const audioBlob = res.blob
         const md = res.metadata || {}
         setLastApiResponse({ type: 'audio-blob', metadata: md })
+        // If the backend included a mood label in metadata, surface it
+        setMood(md.mood || md.emotion || md.predicted_mood || null)
         const url = URL.createObjectURL(audioBlob)
         if (prevObjectUrl.current) {
           try { URL.revokeObjectURL(prevObjectUrl.current) } catch (e) {}
@@ -279,6 +319,7 @@ function App() {
         if (contentType.includes('application/json')) {
           const json = await res.json()
           setLastApiResponse(json)
+          setMood(json.mood || json.emotion || json.predicted_mood || null)
           const fileUrl = json.file_url || json.url
             if (fileUrl) {
             if (prevObjectUrl.current) {
@@ -290,6 +331,7 @@ function App() {
               playOrQueueTrack({ ...metadata, src: fileUrl })
               // if the player was idle, playOrQueueTrack will have set trackInfo; otherwise leave it alone
               setSimLoading(true)
+              setMood(json.mood || json.emotion || json.predicted_mood || null)
             return
           }
           setTrackInfo({ title: json.title || 'Generated track', artist: json.artist || '', album: json.album || '', cover: json.cover || json.artwork || json.album_art || null })
@@ -297,6 +339,8 @@ function App() {
           audioBlob = await res.blob()
           setLastApiResponse({ type: 'audio-blob' })
           setTrackInfo({ title: 'Generated track', artist: '', album: '', cover: null })
+          // no mood provided in this response path
+          setMood(null)
         } else {
           // fallback — try to parse json
           try {
@@ -306,6 +350,7 @@ function App() {
               const fetched = await fetch(json.url)
               audioBlob = await fetched.blob()
               setTrackInfo({ title: json.title || 'Generated track', artist: json.artist || '', album: json.album || '', cover: json.cover || json.artwork || json.album_art || null })
+              setMood(json.mood || json.emotion || json.predicted_mood || null)
             } else {
               throw new Error('Unexpected API response')
             }
@@ -356,6 +401,28 @@ function App() {
 
   return (
     <div id="app-root" className="app-root">
+      {(() => {
+        const hasBuildInfo = buildInfo && buildInfo !== 'dev'
+        const formattedBuild = hasBuildInfo ? formatBuildTimestamp(buildInfo) : null
+        return (
+          <div
+            className={`version-badge ${showBuildTooltip ? 'show-tooltip' : ''}`}
+            aria-hidden="true"
+            role={hasBuildInfo ? 'button' : undefined}
+            tabIndex={hasBuildInfo ? 0 : undefined}
+            title={hasBuildInfo ? formattedBuild : undefined}
+            onClick={hasBuildInfo ? (e) => { e.preventDefault(); setShowBuildTooltip(s => !s) } : undefined}
+            onKeyDown={hasBuildInfo ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowBuildTooltip(s => !s) } } : undefined}
+          >
+            v{pkg.version}
+            {hasBuildInfo && (
+              <div className="version-tooltip" role="status">
+                Built {formattedBuild}
+              </div>
+            )}
+          </div>
+        )
+      })()}
       <main className="main">
         <header className="main-header">
           <h1>Módify</h1>
@@ -366,7 +433,7 @@ function App() {
         
         <section className="content-grid">
           <div className="capture-card">
-            <WebcamCapture onCapture={handleCapture} disabled={loading} />
+            <WebcamCapture onCapture={handleCapture} disabled={loading} mood={mood} />
             {loading && (
               <div className="overlay upload-overlay">
                 <div className="spinner" />

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
 
-export default function WebcamCapture({ onCapture, disabled }) {
+export default function WebcamCapture({ onCapture, disabled, mood }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [stream, setStream] = useState(null)
@@ -63,6 +63,9 @@ export default function WebcamCapture({ onCapture, disabled }) {
       <div className="controls">
         <button onClick={handleClick} disabled={disabled} className="capture-btn">Take Photo</button>
       </div>
+      {mood && (
+        <div className="mood-badge" aria-live="polite">{typeof mood === 'string' ? mood : JSON.stringify(mood)}</div>
+      )}
     </div>
   )
 }
