@@ -3,7 +3,7 @@
 
 // apiurl = 'https://9fad54828c15.ngrok-free.app/'
 
-const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://85fb7c1c5850.ngrok-free.app/'
+const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://21e5329a1d62.ngrok-free.app/'
 
 export async function sendImageToApi(imageBlob) {
   const form = new FormData()

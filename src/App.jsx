@@ -99,12 +99,10 @@ function App() {
     'Composing melody…',
     'Loading song…',
   ]
-  // Refs to keep timers so we can clear them reliably
+
   const typingIntervalRef = useRef(null)
   const messageTimeoutRef = useRef(null)
 
-  // Typewriter effect: progressively reveal characters for the current loader message,
-  // then pause and advance to the next message while `loading` is true.
   useEffect(() => {
     function clearTimers() {
       if (typingIntervalRef.current) { clearInterval(typingIntervalRef.current); typingIntervalRef.current = null }
@@ -118,12 +116,10 @@ function App() {
       return
     }
 
-    // Configuration: pause after fully typed message
     const pauseAfterTyped = 1200
 
     let active = true
 
-    // compute next index with simple wrap (include index 0 in rotation)
     const computeNext = (idx) => {
       const L = loaderMessages.length
       if (L <= 1) return 0
@@ -134,7 +130,6 @@ function App() {
       if (!active) return
       clearTimers()
       const msg = loaderMessages[idx] || ''
-      // slower typing: ms per char (longer = slower). Increased base to slow down animation.
       const speed = Math.max(60, Math.floor(140 - Math.min(80, msg.length)))
 
       let pos = 0
@@ -145,7 +140,6 @@ function App() {
         setTypedText(msg.slice(0, pos))
         if (pos >= msg.length) {
           clearTimers()
-          // keep the fully typed message visible for a moment, then advance to next and type it
           messageTimeoutRef.current = setTimeout(() => {
             if (!active) return
             const next = computeNext(idx)
@@ -157,7 +151,7 @@ function App() {
       }, speed)
     }
 
-    // Start typing from the current loaderIndex (default 0) and cycle normally including index 0
+
     typeMessage(loaderIndex || 0)
 
     return () => {
@@ -166,17 +160,15 @@ function App() {
     }
   }, [loading])
 
-  // When the cover changes, compute an average color and apply it as a CSS variable
+
   useEffect(() => {
     let cancelled = false
     async function computeAndSet() {
       const url = trackInfo?.cover
       if (!url) {
-        // default tint (soft green)
         try {
           const root = document.getElementById('app-root')
           root?.style.setProperty('--tint-rgb', '29,185,84')
-          // compute luminance and choose readable text color
           const r0 = 29, g0 = 185, b0 = 84
           const lum0 = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
           root?.style.setProperty('--tint-text', lum0 > 150 ? '#0b0b0b' : '#ffffff')
@@ -192,7 +184,6 @@ function App() {
           img.onerror = rej
         })
 
-        // draw into small canvas to sample pixels quickly
         const canvas = document.createElement('canvas')
         const size = 64
         canvas.width = size
@@ -367,10 +358,12 @@ function App() {
     <div id="app-root" className="app-root">
       <main className="main">
         <header className="main-header">
-          <h1>EchoFrame</h1>
-          <p>Take a photo, get a song</p>
+          <h1>Módify</h1>
+          <p style={{ margin: 0, padding: 0, opacity: 0.2, fontSize: 12 }}>Pronounced Moodify</p>
+          <h2 style={{ marginTop: 0 }}>Music from your Mood</h2>
+          {/* <p>Take a photo, get a song</p> */}
         </header>
-
+        
         <section className="content-grid">
           <div className="capture-card">
             <WebcamCapture onCapture={handleCapture} disabled={loading} />
