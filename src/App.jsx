@@ -21,6 +21,8 @@ function App() {
   const [mood, setMood] = useState(null)
   const playerRef = useRef()
   const prevObjectUrl = useRef(null)
+  const webcamRef = useRef()
+  const capturedForRef = useRef(new Set())
   const [showBuildTooltip, setShowBuildTooltip] = useState(false)
   // Simple FIFO queue for upcoming tracks (state + ref so UI updates reliably)
   const queueRef = useRef([])
@@ -399,6 +401,46 @@ function App() {
     playAtIndex(prevIdx)
   }
 
+  // Auto-capture when time remaining reaches 60 seconds or less.
+  useEffect(() => {
+    let mounted = true
+    const tick = async () => {
+      try {
+        if (!mounted) return
+        const player = playerRef.current
+        if (!player) return
+        const isPlaying = player.isPlaying?.() || false
+        if (!isPlaying) return
+        const duration = player.getDuration?.() || 0
+        const current = player.getCurrentTime?.() || 0
+        if (!isFinite(duration) || duration <= 0) return
+        const remaining = duration - current
+        if (remaining <= 60) {
+          // Only capture once per audio source
+          const srcKey = audioSrc || ''
+          if (srcKey && !capturedForRef.current.has(srcKey)) {
+            // trigger webcam capture
+            try {
+              const blob = await webcamRef.current?.takePhoto?.()
+              if (blob) {
+                // mark captured for this src so we don't repeat
+                capturedForRef.current.add(srcKey)
+                // send to same handler as manual capture
+                handleCapture(blob)
+              }
+            } catch (e) {
+              console.error('Auto-capture failed', e)
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    const id = setInterval(tick, 1000)
+    return () => { mounted = false; clearInterval(id) }
+  }, [audioSrc])
+
   return (
     <div id="app-root" className="app-root">
       {(() => {
@@ -433,7 +475,7 @@ function App() {
         
         <section className="content-grid">
           <div className="capture-card">
-            <WebcamCapture onCapture={handleCapture} disabled={loading} mood={mood} />
+            <WebcamCapture ref={webcamRef} onCapture={handleCapture} disabled={loading} mood={mood} />
             {loading && (
               <div className="overlay upload-overlay">
                 <div className="spinner" />

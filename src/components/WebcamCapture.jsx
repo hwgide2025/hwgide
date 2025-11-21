@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 
-export default function WebcamCapture({ onCapture, disabled, mood }) {
+const WebcamCapture = forwardRef(function WebcamCapture({ onCapture, disabled, mood }, ref) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [stream, setStream] = useState(null)
@@ -43,6 +43,19 @@ export default function WebcamCapture({ onCapture, disabled, mood }) {
     })
   }
 
+  useImperativeHandle(ref, () => ({
+    async takePhoto() {
+      if (disabled) return null
+      try {
+        const b = await capture()
+        return b
+      } catch (e) {
+        console.error('takePhoto failed', e)
+        return null
+      }
+    }
+  }))
+
   async function handleClick() {
     if (disabled) return
     setError(null)
@@ -68,4 +81,6 @@ export default function WebcamCapture({ onCapture, disabled, mood }) {
       )}
     </div>
   )
-}
+})
+
+export default WebcamCapture

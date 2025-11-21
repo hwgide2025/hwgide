@@ -1,7 +1,7 @@
 {
   "name": "frontendhwgide",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.5",
   "type": "module",
   "homepage": "https://hwgide2025.github.io/",
   "scripts": {
