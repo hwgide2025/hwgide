@@ -4,8 +4,10 @@ import random
 from dotenv import load_dotenv
 import os
 import subprocess
+import tempfile
+import shutil
 import sys
-import spotdl  # Ensure spotDL is installed in your environment
+import spotdl
 import sqlite3
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
@@ -187,21 +189,38 @@ def get_song():
 
     if not songSaved:
         try:
-            command = [
-                "spotdl",  
-                "--output", "newSong",
-                track['external_urls']['spotify']
-            ]
-            subprocess.check_call(command)
-            download_msg = f"Successfully downloaded {track['external_urls']['spotify']} in mp3 format."
-            # command = [
-            #     "mv", "./newSong/*.mp3", audio_path, 
-            #     "&&", "rm", "-r", "newSong"
-            # ]
+            # Create a unique temporary directory per-download so multiple concurrent
+            # downloads (or stale files) in a shared folder don't conflict.
+            temp_dir = tempfile.mkdtemp(prefix="newSong-")
+            try:
+                command = [
+                    "spotdl",
+                    "--output", temp_dir,
+                    track['external_urls']['spotify']
+                ]
+                subprocess.check_call(command)
+                download_msg = f"Successfully downloaded {track['external_urls']['spotify']} in mp3 format."
 
-            renameCommand = "mv ./newSong/*.mp3 "+audio_path
-            # print(renameCommand)
-            subprocess.check_call(renameCommand, shell=True)
+                # Ensure destination directory exists
+                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+
+                # Find mp3 files inside the temp directory. There should normally be one,
+                # but if there are multiple we pick the most recently modified file.
+                mp3s = [f for f in os.listdir(temp_dir) if f.lower().endswith('.mp3')]
+                if not mp3s:
+                    raise FileNotFoundError(f"No mp3 files found in download dir {temp_dir}")
+
+                if len(mp3s) > 1:
+                    mp3s.sort(key=lambda fn: os.path.getmtime(os.path.join(temp_dir, fn)), reverse=True)
+
+                src_mp3 = os.path.join(temp_dir, mp3s[0])
+                shutil.move(src_mp3, audio_path)
+            finally:
+                # Clean up the temporary folder (remove any leftover files)
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass
 
             if os.path.exists(audio_path):
                 if not has_mutagen:
@@ -238,7 +257,7 @@ def get_song():
             download_msg = f"Error downloading {track['external_urls']['spotify']}: {e}"
             return jsonify({'error': download_msg}), 500
         except FileNotFoundError:
-            download_msg = "Error: 'spotdl' command not found. Ensure spotDL is installed and accessible."
+            download_msg = "Error: 'spotdl' command not found or no mp3 produced. Ensure spotDL is installed and accessible."
             return jsonify({'error': download_msg}), 500
     else:
         download_msg = "Skipping download since the song is already saved."
