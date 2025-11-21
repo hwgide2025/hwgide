@@ -73,6 +73,7 @@ body { overflow-y: auto; }
   /* Increased alpha for a more noticeable but still subtle tint */
   background: linear-gradient(180deg, rgba(var(--tint-rgb, 29,185,84), 0.6), rgba(0,0,0,0));
 }
+
 .version-badge {
   position: fixed;
   right: 12px;

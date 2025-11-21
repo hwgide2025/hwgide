@@ -66,3 +66,28 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Hide scrollbars on all major platforms while preserving scroll functionality
+   - Firefox: `scrollbar-width: none`
+   - IE/Edge (legacy): `-ms-overflow-style: none`
+   - WebKit (Chrome, Safari, new Edge): set scrollbar sizes to 0 and transparent
+*/
+html, body, * {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ and Edge */
+}
+
+/* WebKit browsers */
+html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  background: transparent;
+}
+
+/* Optional: make any explicit scrollbar tracks/thumbs transparent if defined elsewhere */
+html::-webkit-scrollbar-track, body::-webkit-scrollbar-track, *::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb {
+  background: transparent;
+}
