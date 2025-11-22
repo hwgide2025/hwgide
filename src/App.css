@@ -352,6 +352,13 @@ body { overflow-y: auto; }
 .history-artist { font-size:0.85rem; color:#bdbdbd }
 .history-empty { color:#9aa3a3; font-size:0.95rem }
 
+/* Make the history/queue content area fill available height and scroll when long */
+.history-card > div { display:flex; flex-direction:column; gap:0.5rem; flex:1; min-height:0 }
+.history-list { overflow-y: auto; padding-right: 6px }
+.history-list::-webkit-scrollbar { width: 10px }
+.history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 6px }
+.history-list::-webkit-scrollbar-track { background: transparent }
+
 /* Toggle at top of queue card to switch between Up Next and Previously Played */
 .queue-toggle { display:flex; gap:0.5rem; justify-content:center; margin-bottom:0.75rem }
 .toggle-btn { background: rgba(255,255,255,0.03); color: #cfcfcf; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 700 }

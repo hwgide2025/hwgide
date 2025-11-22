@@ -42,3 +42,70 @@ export async function sendImageToApi(imageBlob) {
 }
 
 export default { sendImageToApi }
+
+export async function requestTrack(artist, title) {
+  const payload = { artist: artist || '', title: title || '' }
+
+  const base = (API_ENDPOINT || '').replace(/\/+$/, '')
+  const url = `${base}/request_song`
+
+  // First, request JSON metadata from /request_song. Prefer a returned `file_url`.
+  const metaRes = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+
+  if (!metaRes.ok) {
+    let body = ''
+    try { body = await metaRes.text() } catch (e) { /* ignore */ }
+    throw new Error(`API metadata request failed: ${metaRes.status} ${metaRes.statusText} - ${body}`)
+  }
+
+  const contentType = (metaRes.headers.get('content-type') || '').toLowerCase()
+  if (contentType.includes('application/json')) {
+    const json = await metaRes.json()
+    if (json.error) throw new Error(`API error: ${json.error}`)
+    const fileUrl = json.file_url || json.url
+    if (fileUrl) {
+      const metadata = {
+          title: json.track?.name || json.title || title || '',
+          artist: json.track?.artist || json.artist || artist || '',
+          album: json.track?.album || json.album || '',
+          cover: json.cover || json.artwork || json.album_art || (json.track && json.track.album && json.track.album.images && json.track.album.images[0] ? json.track.album.images[0].url : '')
+        }
+      return { type: 'file', url: fileUrl, metadata }
+    }
+    // otherwise fall through to attempt streaming in POST response
+  }
+
+  // Fallback: ask the server to stream audio in the POST response
+  const streamRes = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Return-Audio': '1' },
+    body: JSON.stringify(payload)
+  })
+
+  if (!streamRes.ok) {
+    let body = ''
+    try { body = await streamRes.text() } catch (e) { /* ignore */ }
+    throw new Error(`API stream request failed: ${streamRes.status} ${streamRes.statusText} - ${body}`)
+  }
+
+  const streamCt = (streamRes.headers.get('content-type') || '').toLowerCase()
+  if (streamCt.startsWith('audio/') || streamCt === 'application/octet-stream') {
+    const blob = await streamRes.blob()
+    const metadata = {
+      title: streamRes.headers.get('X-Track-Title') || title || '',
+      artist: streamRes.headers.get('X-Track-Artist') || artist || '',
+      album: streamRes.headers.get('X-Track-Album') || '',
+      cover: streamRes.headers.get('X-Track-Cover') || ''
+    }
+    return { type: 'stream', blob, metadata }
+  }
+
+  let body = ''
+  try { body = await streamRes.text() } catch (e) { /* ignore */ }
+  throw new Error(`API stream response was not audio: ${streamCt} - ${body}`)
+  }
+

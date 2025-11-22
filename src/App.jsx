@@ -5,7 +5,7 @@ import Player from './components/Player'
 import { PlayIcon, RemoveIcon } from './components/Icons'
 import WebcamCapture from './components/WebcamCapture'
 import buildInfo from './buildInfo'
-import { sendImageToApi } from './api'
+import { sendImageToApi, requestTrack } from './api'
 
 function App() {
   const [audioSrc, setAudioSrc] = useState(null)
@@ -422,15 +422,88 @@ function App() {
   async function fetchAndUseBlob(url) {
     if (!url) return
     try {
+      // If the URL is a blob: URL, many browsers won't allow fetch() on it
+      // (or it may have been revoked). In that case, attempt to ask the backend
+      // for the track using artist/title metadata instead of fetching the blob URL.
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        console.debug('fetchAndUseBlob: blob URL cannot be fetched; attempting backend requestTrack using trackInfo')
+        try {
+          setError(null)
+          setLoading(true)
+          setSimLoading(true)
+          const res = await requestTrack(trackInfo?.artist || '', trackInfo?.title || '')
+
+          if (!res) throw new Error('requestTrack returned no result')
+
+          if (res.type === 'file' && res.url) {
+            const md = res.metadata || {}
+            const coverUrl = md.cover || trackInfo?.cover || null
+            setLastApiResponse({ type: 'file-url', metadata: md })
+            setMood(md.mood || md.emotion || md.predicted_mood || null)
+            playOrQueueTrack({ title: md.title || trackInfo.title || 'Generated track', artist: md.artist || trackInfo.artist || '', album: md.album || '', cover: coverUrl, src: res.url })
+            setSimLoading(true)
+            return
+          }
+
+          if (res.type === 'stream' && res.blob) {
+            const audioBlob = res.blob
+            const md = res.metadata || {}
+            setLastApiResponse({ type: 'audio-blob', metadata: md })
+            setMood(md.mood || md.emotion || md.predicted_mood || null)
+            const obj = URL.createObjectURL(audioBlob)
+            if (prevObjectUrl.current) try { URL.revokeObjectURL(prevObjectUrl.current) } catch (e) {}
+            prevObjectUrl.current = obj
+            playOrQueueTrack({ title: md.title || trackInfo.title || 'Generated track', artist: md.artist || trackInfo.artist || '', album: md.album || '', cover: md.cover || null, src: obj })
+            setSimLoading(true)
+            return
+          }
+        } catch (e) {
+          console.error('Backend request from fetchAndUseBlob failed', e)
+          setError(e.message || String(e))
+        } finally {
+          setLoading(false)
+          setSimLoading(false)
+        }
+        return
+      }
       setError(null)
       setLoading(true)
       const fetched = await fetch(url, { method: 'GET', mode: 'cors' })
-      if (!fetched.ok) throw new Error(`Failed to download audio: ${fetched.status} ${fetched.statusText}`)
+      if (!fetched.ok) {
+        // Try to surface server error details
+        let bodyText = ''
+        try { bodyText = await fetched.text() } catch (e) { /* ignore */ }
+        throw new Error(`Failed to download audio: ${fetched.status} ${fetched.statusText} - ${bodyText}`)
+      }
+
+      // Inspect Content-Type before attempting to treat response as audio blob
+      const respContentType = (fetched.headers.get('content-type') || '').toLowerCase()
+      if (!respContentType.startsWith('audio/') && respContentType !== 'application/octet-stream') {
+        // If server returned JSON, parse it for error or file_url
+        if (respContentType.includes('application/json')) {
+          let json = null
+          try { json = await fetched.json() } catch (e) { /* ignore */ }
+          if (json) {
+            // If API returned a file_url, try fetching that instead
+            const fileUrl = json.file_url || json.url
+            if (fileUrl) {
+              console.debug('fetchAndUseBlob: server returned JSON with file_url; fetching that URL instead', fileUrl)
+              // attempt to fetch the fileUrl (may be absolute)
+              return await fetchAndUseBlob(fileUrl)
+            }
+            const msg = json.error || JSON.stringify(json)
+            throw new Error(`API returned JSON but no audio: ${msg}`)
+          }
+        }
+
+        // If HTML or other non-audio type was returned, surface the text body for debugging
+        let bodyText = ''
+        try { bodyText = await fetched.text() } catch (e) { /* ignore */ }
+        throw new Error(`Downloaded file is not an audio type: ${respContentType || 'unknown'} - ${bodyText}`)
+      }
+
       const blob = await fetched.blob()
       const mime = blob.type || ''
-      if (!mime.startsWith('audio/') && mime !== 'application/octet-stream') {
-        throw new Error(`Downloaded file is not an audio type: ${mime}`)
-      }
   const obj = URL.createObjectURL(blob)
   if (prevObjectUrl.current) try { URL.revokeObjectURL(prevObjectUrl.current) } catch (e) {}
   prevObjectUrl.current = obj
@@ -673,8 +746,15 @@ function App() {
               </div>
             )}
             {error && <div className="error">{error}</div>}
+            
           </div>
-
+          {/* <div className="debug-card">
+            <h3>Debug</h3>
+            <div><strong>API response:</strong></div>
+            <pre className="debug-pre">{lastApiResponse ? JSON.stringify(lastApiResponse, null, 2) : '—'}</pre>
+            <div><strong>Audio src:</strong> {audioSrc ? (<a href={audioSrc} target="_blank" rel="noreferrer">{audioSrc}</a>) : '—'}</div>
+            <div><strong>Audio error:</strong> {audioError || '—'}</div>
+          </div> */}
           </div>
 
           <div className="player-card">
@@ -703,10 +783,86 @@ function App() {
                 }
               }}
               onError={(err) => {
+                // Better diagnostics: determine which src failed and find matching metadata
                 setAudioError(err); setSimLoading(false); setLoading(false)
-                // If unsupported format, try fetching as blob and playing via object URL (may work around some server issues)
-                if (err && err.toLowerCase().includes('unsupported')) {
-                  fetchAndUseBlob(audioSrc)
+                try {
+                  const elow = (err || '').toLowerCase()
+
+                  // If unsupported format, try fetching as blob and playing via object URL
+                  if (elow.includes('unsupported')) {
+                    console.debug('Player error unsupported — trying fetch fallback for', audioSrc)
+                    fetchAndUseBlob(audioSrc)
+                    return
+                  }
+
+                  // Only attempt backend replacement for network/decoding/aborted/unknown errors
+                  const shouldAttemptBackend = elow.includes('network') || elow.includes('decoding') || elow.includes('aborted') || elow.includes('unknown') || elow.includes('failed to fetch')
+                  if (!shouldAttemptBackend) return
+
+                  // Determine the failed source and best metadata to ask the backend for
+                  const failedSrc = audioSrc
+                  let metaArtist = trackInfo?.artist || ''
+                  let metaTitle = trackInfo?.title || ''
+
+                  // try to find matching metadata in history or queue if trackInfo is missing
+                  if ((!metaArtist && !metaTitle) || !failedSrc) {
+                    const fromHist = history && history.find(h => h.src === failedSrc)
+                    const fromQueue = queue && queue.find(q => q.src === failedSrc)
+                    const found = fromHist || fromQueue
+                    if (found) {
+                      metaArtist = metaArtist || found.artist || ''
+                      metaTitle = metaTitle || found.title || ''
+                    }
+                  }
+
+                  // If we still don't have artist/title, avoid blind request
+                  if (!metaArtist && !metaTitle) {
+                    console.debug('No artist/title available for backend request; skipping requestTrack')
+                    setError('Failed to fetch audio and no metadata available for backend lookup')
+                    return
+                  }
+
+                  console.debug('Attempting backend requestTrack for', { artist: metaArtist, title: metaTitle })
+                  setError(null)
+                  setLoading(true)
+                  setSimLoading(true)
+
+                  ;(async () => {
+                    try {
+                      const res = await requestTrack(metaArtist, metaTitle)
+                      if (!res) throw new Error('requestTrack returned no result')
+
+                      if (res.type === 'file' && res.url) {
+                        const md = res.metadata || {}
+                        const coverUrl = md.cover || trackInfo?.cover || null
+                        setLastApiResponse({ type: 'file-url', metadata: md })
+                        setMood(md.mood || md.emotion || md.predicted_mood || null)
+                        playOrQueueTrack({ title: md.title || metaTitle || 'Generated track', artist: md.artist || metaArtist || '', album: md.album || '', cover: coverUrl, src: res.url })
+                        setSimLoading(true)
+                        return
+                      }
+
+                      if (res.type === 'stream' && res.blob) {
+                        const audioBlob = res.blob
+                        const md = res.metadata || {}
+                        setLastApiResponse({ type: 'audio-blob', metadata: md })
+                        setMood(md.mood || md.emotion || md.predicted_mood || null)
+                        const url = URL.createObjectURL(audioBlob)
+                        if (prevObjectUrl.current) try { URL.revokeObjectURL(prevObjectUrl.current) } catch (e) {}
+                        prevObjectUrl.current = url
+                        playOrQueueTrack({ title: md.title || metaTitle || 'Generated track', artist: md.artist || metaArtist || '', album: md.album || '', cover: md.cover || null, src: url })
+                        return
+                      }
+                    } catch (e) {
+                      console.error('requestTrack failed', e)
+                      setError(e.message || String(e))
+                    } finally {
+                      setLoading(false)
+                      setSimLoading(false)
+                    }
+                  })()
+                } catch (e) {
+                  console.error('onError handler failed', e)
                 }
               }}
               onPlay={() => {
@@ -747,23 +903,20 @@ function App() {
             {queueView === 'previously' ? (
               <div>
                 <h3>Previously played</h3>
-                {/* Show the track that played immediately before the current one (history[1]) */}
+                {/* Show the list of previously played tracks (all items after the current one) */}
                 {(!history || history.length <= 1) ? (
                   <div className="history-empty">No previous track</div>
                 ) : (
                   <ul className="history-list">
-                    {(() => {
-                      const prev = history[1]
-                      return (
-                        <li key={prev.playedAt || 1} className="history-item" onClick={() => { playAtIndex(1) }}>
-                          <div className="history-cover" style={{ backgroundImage: prev.cover ? `url(${prev.cover})` : undefined }} />
-                          <div className="history-meta">
-                            <div className="history-title">{prev.title}</div>
-                            <div className="history-artist">{prev.artist}</div>
-                          </div>
-                        </li>
-                      )
-                    })()}
+                    {history.slice(1).map((prev, idx) => (
+                      <li key={`${prev.src || prev.playedAt || idx}`} className="history-item" onClick={() => playAtIndex(idx + 1)}>
+                        <div className="history-cover" style={{ backgroundImage: prev.cover ? `url(${prev.cover})` : undefined }} />
+                        <div className="history-meta">
+                          <div className="history-title">{prev.title}</div>
+                          <div className="history-artist">{prev.artist}</div>
+                        </div>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
@@ -793,13 +946,7 @@ function App() {
             )}
           </aside>
 
-          {/* <div className="debug-card">
-            <h3>Debug</h3>
-            <div><strong>API response:</strong></div>
-            <pre className="debug-pre">{lastApiResponse ? JSON.stringify(lastApiResponse, null, 2) : '—'}</pre>
-            <div><strong>Audio src:</strong> {audioSrc ? (<a href={audioSrc} target="_blank" rel="noreferrer">{audioSrc}</a>) : '—'}</div>
-            <div><strong>Audio error:</strong> {audioError || '—'}</div>
-          </div> */}
+          
         </section>
       </main>
     </div>
