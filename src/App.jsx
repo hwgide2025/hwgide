@@ -537,6 +537,28 @@ function App() {
   function playAtIndex(i) {
     const item = history[i]
     if (!item) return
+    // When jumping to an item in history, promote it to the current track
+    // and make sure the previously-current track becomes the next item in history
+    setHistory(h => {
+      const now = Date.now()
+      const current = (h && h.length > 0) ? h[0] : null
+      // Remove any existing occurrences of the selected item
+      const withoutSelected = (h || []).filter(x => x.src !== item.src)
+      const newList = []
+      // Put the selected item first (now playing)
+      newList.push({ title: item.title || 'Track', artist: item.artist || '', album: item.album || '', cover: item.cover || null, src: item.src, playedAt: now })
+      // Then re-insert the previous current track (if it existed and isn't the same as selected)
+      if (current && current.src !== item.src) {
+        newList.push(current)
+      }
+      // Append the rest (excluding the selected item and the previous current which we already added)
+      for (const it of withoutSelected) {
+        if (current && it.src === current.src) continue
+        newList.push(it)
+      }
+      return newList.slice(0, 20)
+    })
+
     setAudioSrc(item.src)
     setTrackInfo({ title: item.title || 'Track', artist: item.artist || '', album: item.album || '', cover: item.cover || null })
     setTimeout(() => playerRef.current?.play(), 100)
