@@ -59,7 +59,7 @@ body { overflow-y: auto; }
   min-height: 100vh; /* allow content to grow beyond the initial viewport */
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
 }
-.content-grid { display: grid; grid-template-columns: 1fr 420px 260px; gap: 1.5rem; align-items: start }
+.content-grid { display: grid; grid-template-columns: 18% 1fr 320px; gap: 1.5rem; align-items: start }
 
 .main { flex:1; padding: 0.75rem; background: linear-gradient(180deg,#121212,#0b0b0b); color: #eaeaea; overflow: visible; }
 
@@ -122,7 +122,7 @@ body { overflow-y: auto; }
 .main-header h1 { margin: 0 0 0.25rem 0 }
 .main-header { transition: color 240ms ease }
 .main-header h1, .main-header p, .main-header h2 { color: var(--tint-text, #ffffff) }
-.content-grid { display: grid; grid-template-columns: 28% 1fr 220px; gap: 1rem; align-items: start }
+.content-grid { display: grid; grid-template-columns: 18% 1fr 320px; gap: 1rem; align-items: start }
 
 /* Column wrapper for header + capture card so header sits above the capture area */
 .capture-column { display:flex; flex-direction:column; gap:0.75rem }
@@ -348,6 +348,16 @@ body { overflow-y: auto; }
 .history-title { font-size:0.95rem; font-weight:600 }
 .history-artist { font-size:0.85rem; color:#bdbdbd }
 .history-empty { color:#9aa3a3; font-size:0.95rem }
+
+/* Toggle at top of queue card to switch between Up Next and Previously Played */
+.queue-toggle { display:flex; gap:0.5rem; justify-content:center; margin-bottom:0.75rem }
+.toggle-btn { background: rgba(255,255,255,0.03); color: #cfcfcf; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 700 }
+.toggle-btn.active { background: linear-gradient(90deg, rgba(var(--tint-rgb,29,185,84),0.12), rgba(255,255,255,0.02)); color: var(--tint-text, #fff); box-shadow: 0 6px 18px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.06) }
+.toggle-btn:focus { outline: 2px solid rgba(var(--tint-rgb,29,185,84),0.28); outline-offset: 2px }
+
+.history-meta { flex: 1; display:flex; flex-direction:column; align-items: flex-start }
+.action-group { display:flex; gap:6px }
+.boxed-btn { background: linear-gradient(90deg,#1db954,#61dafb); border:none; color:#022; padding:6px; border-radius:8px; cursor:pointer }
 
 /* Volume button / mute fixes: ensure icon contrasts and clickable area */
 .mute-btn { background: transparent; border: none; color: #eaeaea; padding: 6px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; overflow: visible; position: relative; z-index: 2 }

@@ -1,3 +1,3 @@
 // Generated at build time
-const BUILD_TIMESTAMP = '2025-11-22T00:37:54.176Z'
+const BUILD_TIMESTAMP = '2025-11-22T01:12:08.667Z'
 export default BUILD_TIMESTAMP

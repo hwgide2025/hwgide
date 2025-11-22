@@ -27,6 +27,8 @@ function App() {
   // Simple FIFO queue for upcoming tracks (state + ref so UI updates reliably)
   const queueRef = useRef([])
   const [queue, setQueue] = useState([])
+  // toggle which list is visible in the right column: 'upnext' or 'previously'
+  const [queueView, setQueueView] = useState('upnext')
 
   // enqueue a track (object with { src, title, artist, album, cover })
   function enqueueTrack(track) {
@@ -705,46 +707,68 @@ function App() {
           </div>
 
           <aside className="history-card">
-            <h3>Previously played</h3>
-            {/* Show the track that played immediately before the current one (history[1]) */}
-            {(!history || history.length <= 1) ? (
-              <div className="history-empty">No previous track</div>
-            ) : (
-              <ul className="history-list">
-                {(() => {
-                  const prev = history[1]
-                  return (
-                    <li key={prev.playedAt || 1} className="history-item" onClick={() => { playAtIndex(1) }}>
-                      <div className="history-cover" style={{ backgroundImage: prev.cover ? `url(${prev.cover})` : undefined }} />
-                      <div className="history-meta">
-                        <div className="history-title">{prev.title}</div>
-                        <div className="history-artist">{prev.artist}</div>
-                      </div>
-                    </li>
-                  )
-                })()}
-              </ul>
-            )}
+            <div className="queue-toggle" role="tablist" aria-label="Queue view">
+              <button
+                role="tab"
+                aria-selected={queueView === 'upnext'}
+                className={`toggle-btn ${queueView === 'upnext' ? 'active' : ''}`}
+                onClick={() => setQueueView('upnext')}
+              >Up Next</button>
+              <button
+                role="tab"
+                aria-selected={queueView === 'previously'}
+                className={`toggle-btn ${queueView === 'previously' ? 'active' : ''}`}
+                onClick={() => setQueueView('previously')}
+              >Previously played</button>
+            </div>
 
-            <div style={{ marginTop: '1rem' }}>
-              <h3>Up Next</h3>
-              {queue.length === 0 ? (
-                <div className="history-empty">No tracks queued</div>
-              ) : (
-                <ul className="history-list">
-                  {queue.slice(0,1).map((item, idx) => (
-                    <li key={`${item.src}-${idx}`} className="history-item queue-item" title={`${item.title || 'Track'} — ${item.artist || ''}`} aria-label={`Queued: ${item.title || 'Track'} by ${item.artist || ''}`}>
-                      {/* only show cover for queue items; title/artist available via tooltip (title attribute) for accessibility */}
-                      <div className="history-cover queue-only-cover" style={{ backgroundImage: item.cover ? `url(${item.cover})` : undefined }} />
-                      <div className="action-group">
+            {queueView === 'previously' ? (
+              <div>
+                <h3>Previously played</h3>
+                {/* Show the track that played immediately before the current one (history[1]) */}
+                {(!history || history.length <= 1) ? (
+                  <div className="history-empty">No previous track</div>
+                ) : (
+                  <ul className="history-list">
+                    {(() => {
+                      const prev = history[1]
+                      return (
+                        <li key={prev.playedAt || 1} className="history-item" onClick={() => { playAtIndex(1) }}>
+                          <div className="history-cover" style={{ backgroundImage: prev.cover ? `url(${prev.cover})` : undefined }} />
+                          <div className="history-meta">
+                            <div className="history-title">{prev.title}</div>
+                            <div className="history-artist">{prev.artist}</div>
+                          </div>
+                        </li>
+                      )
+                    })()}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <div>
+                <h3>Up Next</h3>
+                {queue.length === 0 ? (
+                  <div className="history-empty">No tracks queued</div>
+                ) : (
+                  <ul className="history-list">
+                    {queue.map((item, idx) => (
+                      <li key={`${item.src}-${idx}`} className="history-item queue-item" title={`${item.title || 'Track'} — ${item.artist || ''}`} aria-label={`Queued: ${item.title || 'Track'} by ${item.artist || ''}`}>
+                        <div className="history-cover queue-only-cover" style={{ backgroundImage: item.cover ? `url(${item.cover})` : undefined }} />
+                        <div className="history-meta">
+                          <div className="history-title">{item.title}</div>
+                          <div className="history-artist">{item.artist}</div>
+                        </div>
+                        <div className="action-group">
                           <button className="boxed-btn" title="Play now" onClick={() => playNowFromQueue(idx)} aria-label="Play now"><PlayIcon size={22} color="#ffffff" /></button>
                           <button className="boxed-btn" title="Remove from queue" onClick={() => removeFromQueue(idx)} aria-label="Remove"><RemoveIcon size={20} color="#ffffff" /></button>
                         </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </aside>
 
           {/* <div className="debug-card">
