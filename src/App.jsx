@@ -229,8 +229,12 @@ function App() {
           // indicate there's no player cover available so CSS falls back to tint-only
           root?.style.setProperty('--player-cover-url', 'none')
           const r0 = 29, g0 = 185, b0 = 84
+          // compute composite luminance between base and brighter dark fallback
+          const darkFallback = { r: 60, g: 160, b: 100 }
           const lum0 = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
-          root?.style.setProperty('--tint-text', lum0 > 150 ? '#0b0b0b' : '#ffffff')
+          const lumDarkFallback = 0.2126 * darkFallback.r + 0.7152 * darkFallback.g + 0.0722 * darkFallback.b
+          const lumComposite = (lum0 + lumDarkFallback) / 2
+          root?.style.setProperty('--tint-text', lumComposite > 180 ? '#0b0b0b' : '#ffffff')
         } catch (e) {}
         return
       }
@@ -361,12 +365,16 @@ function App() {
             const toHex = (n) => n.toString(16).padStart(2, '0')
             root?.style.setProperty('--tint-text-dark', `#${toHex(brightR)}${toHex(brightG)}${toHex(brightB)}`)
             root?.style.setProperty('--text-rgb-dark', `${brightR}, ${brightG}, ${brightB}`)
+
+            // choose a readable header text color by sampling the composite luminance
+            const lumOrig = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            const lumBright = 0.2126 * brightR + 0.7152 * brightG + 0.0722 * brightB
+            const lumComposite = (lumOrig + lumBright) / 2
+            root?.style.setProperty('--tint-text', lumComposite > 180 ? '#0b0b0b' : '#ffffff')
           } catch (e) {
             // ignore
           }
-          // set readable header text color based on luminance
-          const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-          root?.style.setProperty('--tint-text', lum > 150 ? '#0b0b0b' : '#ffffff')
+          // (tint text already set from composite luminance above)
         }
       } catch (e) {
         // If anything fails (CORS, decode), fallback to default tint
@@ -377,8 +385,11 @@ function App() {
           root?.style.setProperty('--text-rgb-dark', '9,65,22')
           root?.style.setProperty('--tint-text-dark', '#092f16')
           const r0 = 29, g0 = 185, b0 = 84
+          const darkFallback = { r: 60, g: 160, b: 100 }
           const lum0 = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0
-          root?.style.setProperty('--tint-text', lum0 > 150 ? '#0b0b0b' : '#ffffff')
+          const lumDarkFallback = 0.2126 * darkFallback.r + 0.7152 * darkFallback.g + 0.0722 * darkFallback.b
+          const lumComposite = (lum0 + lumDarkFallback) / 2
+          root?.style.setProperty('--tint-text', lumComposite > 180 ? '#0b0b0b' : '#ffffff')
         } catch (e) {}
       }
     }
