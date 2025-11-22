@@ -352,18 +352,56 @@ body { overflow-y: auto; }
 .history-artist { font-size:0.85rem; color:#bdbdbd }
 .history-empty { color:#9aa3a3; font-size:0.95rem }
 
-/* Make the history/queue content area fill available height and scroll when long */
-.history-card > div { display:flex; flex-direction:column; gap:0.5rem; flex:1; min-height:0 }
+/* Clamp text to two lines with an ellipsis for long titles/artists */
+.history-title, .history-artist,
+.track-title, .track-artist,
+.player-title, .player-artist {
+  display: -webkit-box;
+  display: -moz-box;
+  display: box;
+  -webkit-box-orient: vertical;
+  -moz-box-orient: vertical;
+  box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal; /* ensure wrapping is allowed */
+}
+
+.history-card > div:not(.queue-toggle) { display:flex; flex-direction:column; gap:0.5rem; flex:1; min-height:0 }
 .history-list { overflow-y: auto; padding-right: 6px }
 .history-list::-webkit-scrollbar { width: 10px }
 .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 6px }
 .history-list::-webkit-scrollbar-track { background: transparent }
 
 /* Toggle at top of queue card to switch between Up Next and Previously Played */
-.queue-toggle { display:flex; gap:0.5rem; justify-content:center; margin-bottom:0.75rem }
-.toggle-btn { background: rgba(255,255,255,0.03); color: #cfcfcf; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 700 }
+.queue-toggle { display:flex; gap: 12px; justify-content: flex-start; margin-bottom:0.75rem }
+.toggle-btn { background: rgba(255,255,255,0.03); color: #cfcfcf; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 10px; cursor: pointer; font-weight: 700; flex: 0 0 calc(50% - 6px); text-align: center; font-size: 0.95rem }
 .toggle-btn.active { background: linear-gradient(90deg, rgba(var(--tint-rgb,29,185,84),0.12), rgba(255,255,255,0.02)); color: var(--tint-text, #fff); box-shadow: 0 6px 18px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.06) }
 .toggle-btn:focus { outline: 2px solid rgba(var(--tint-rgb,29,185,84),0.28); outline-offset: 2px }
+
+@media (max-width: 480px) {
+  .queue-toggle { flex-direction: column; gap: 0.5rem }
+  .toggle-btn { width: 100%; flex: none }
+}
+
+/* Stronger selector to ensure toggle buttons occupy exactly half the card width */
+.history-card .queue-toggle { display: flex; gap: 12px; flex-direction: row; align-items: flex-start; justify-content: flex-start; margin-top: 0 }
+.history-card .queue-toggle .toggle-btn {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  flex: 0 0 calc(50% - 6px) !important;
+  width: calc(50% - 6px) !important;
+  padding: 6px 8px !important;
+  font-size: 0.9rem !important;
+  height: 44px !important;
+  line-height: 1.1 !important;
+  align-self: flex-start !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+}
 
 .history-meta { flex: 1; display:flex; flex-direction:column; align-items: flex-start }
 .action-group { display:flex; gap:6px }
