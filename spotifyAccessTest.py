@@ -29,7 +29,9 @@ from urllib.parse import quote
 
 load_dotenv()
 
-listener = ngrok.forward(5000, authtoken=os.getenv('NGROK_AUTH_TOKEN')) 
+domain = os.getenv('NGROK_DOMAIN', None)
+
+listener = ngrok.forward(5000, authtoken=os.getenv('NGROK_AUTH_TOKEN'), domain=domain) 
 print(f"Ingress established at {listener.url()}") 
 
 app = Flask(__name__)
