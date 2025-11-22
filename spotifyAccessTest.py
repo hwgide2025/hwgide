@@ -108,6 +108,173 @@ def list_songs():
         files = [f for f in os.listdir(songs_dir) if os.path.isfile(os.path.join(songs_dir, f))]
     return jsonify({'files': files})
 
+
+def _download_track_and_prepare(track, search_query):
+    """Download a Spotify track using spotdl and ensure it's saved in the local `songs/` folder.
+    Returns a dict with metadata similar to the main route's JSON response.
+    """
+    songDB = sqlite3.connect('songs.db')
+    c = songDB.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS saved_songs (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            artist TEXT, 
+            search_query TEXT
+        )
+    ''')
+
+    track_id = track.get('id')
+    track_name = track.get('name')
+    track_artists = ', '.join(a.get('name', '') for a in track.get('artists', []))
+
+    c.execute('SELECT id FROM saved_songs WHERE id = ?', (track_id,))
+    row = c.fetchone()
+    songSaved = row is not None
+    saved_msg = 'Song already exists in database.' if songSaved else ''
+
+    filename = f"{track_name}_{track_artists}.mp3"
+    filename = "".join([ch if ch.isalnum() or ch in "._-" else "_" for ch in filename])
+    audio_path = os.path.abspath(os.path.join('songs', filename))
+
+    download_msg = ''
+
+    if not songSaved:
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="newSong-")
+            try:
+                command = [
+                    "spotdl",
+                    "--output", temp_dir,
+                    track.get('external_urls', {}).get('spotify')
+                ]
+                subprocess.check_call(command)
+
+                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+                mp3s = [f for f in os.listdir(temp_dir) if f.lower().endswith('.mp3')]
+                if not mp3s:
+                    raise FileNotFoundError(f"No mp3 files found in download dir {temp_dir}")
+                if len(mp3s) > 1:
+                    mp3s.sort(key=lambda fn: os.path.getmtime(os.path.join(temp_dir, fn)), reverse=True)
+                src_mp3 = os.path.join(temp_dir, mp3s[0])
+                shutil.move(src_mp3, audio_path)
+            finally:
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass
+
+            if os.path.exists(audio_path):
+                if not has_mutagen:
+                    return ({'error': 'Server-side validation unavailable: mutagen not installed'}, 500)
+                try:
+                    mp = MP3(audio_path)
+                    if not getattr(mp.info, 'length', 0):
+                        raise MutagenError('MP3 duration is zero')
+                except Exception as e:
+                    try:
+                        os.remove(audio_path)
+                    except Exception:
+                        pass
+                    return ({'error': f'Downloaded file is not a valid MP3: {e}'}, 500)
+
+            try:
+                c.execute('''
+                    INSERT OR REPLACE INTO saved_songs (id, name, artist, search_query)
+                    VALUES (?, ?, ?, ?)
+                ''', (track_id, track_name, track_artists, search_query))
+                songDB.commit()
+                songSaved = True
+                saved_msg = 'Song saved to database.'
+            except Exception as e:
+                print(f"[db] failed to insert saved_songs for id={track_id}: {e}")
+        except subprocess.CalledProcessError as e:
+            return ({'error': f'Error downloading {track.get("external_urls", {}).get("spotify")}: {e}'}, 500)
+        except FileNotFoundError:
+            return ({'error': "Error: 'spotdl' command not found or no mp3 produced."}, 500)
+
+    file_url = f"{listener.url()}/songs/{quote(filename)}"
+    file_mime, _ = mimetypes.guess_type(audio_path)
+    file_size = None
+    head_b64 = None
+    if os.path.exists(audio_path):
+        try:
+            file_size = os.path.getsize(audio_path)
+            with open(audio_path, 'rb') as fh:
+                head = fh.read(128)
+                head_b64 = base64.b64encode(head).decode('ascii')
+        except Exception as e:
+            print(f"[diagnostic] failed to read file head: {e}")
+
+    resp = {
+        'track': {
+            'name': track_name,
+            'artist': track_artists,
+            'album': track.get('album', {}).get('name', ''),
+            'release_date': track.get('album', {}).get('release_date', ''),
+            'popularity': track.get('popularity', 0),
+            'spotify_url': track.get('external_urls', {}).get('spotify', '')
+        },
+        'saved_msg': saved_msg,
+        'download_msg': download_msg,
+        'file_url': file_url,
+        'file_mime': file_mime,
+        'file_size': file_size,
+        'file_head_b64': head_b64
+    }
+
+    songDB.close()
+    return (resp, 200)
+
+
+
+@app.route('/request_song', methods=['POST'])
+def request_song():
+    """Request a specific song by title and/or artist. Accepts JSON or form data with
+    `title` and `artist` fields. Returns the same metadata + file URL as the main endpoint.
+    """
+    data = {}
+    if request.is_json:
+        data = request.get_json() or {}
+    else:
+        data = request.form.to_dict() or request.values.to_dict() or {}
+
+    title = (data.get('title') or request.args.get('title') or '').strip()
+    artist = (data.get('artist') or request.args.get('artist') or '').strip()
+    if not title and not artist:
+        return jsonify({'error': 'Provide at least `title` or `artist` parameter.'}), 400
+
+    CLIENT_ID = os.getenv('CLIENT_ID')
+    CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+    if not CLIENT_ID or not CLIENT_SECRET:
+        return jsonify({'error': 'Server Spotify credentials not configured.'}), 500
+
+    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=CLIENT_ID, client_secret=CLIENT_SECRET))
+
+    # Build a targeted search query. Use Spotify advanced search fields for best match.
+    q_parts = []
+    if title:
+        q_parts.append(f'track:{title}')
+    if artist:
+        q_parts.append(f'artist:{artist}')
+    q = ' '.join(q_parts)
+
+    try:
+        results = sp.search(q=q, type='track', limit=10)
+        tracks = results.get('tracks', {}).get('items', [])
+    except Exception as e:
+        return jsonify({'error': f'Spotify search failed: {e}'}), 500
+
+    if not tracks:
+        return jsonify({'error': 'No matching tracks found'}), 404
+
+    # Prefer exact-ish matches; for now take the first result
+    track = tracks[0]
+
+    # Delegate download+prepare work to helper
+    resp, code = _download_track_and_prepare(track, q)
+    return (jsonify(resp), code) if isinstance(resp, dict) else resp
+
 @app.route('/', methods=['POST'])
 def get_song():
     if 'photo' not in request.files:
