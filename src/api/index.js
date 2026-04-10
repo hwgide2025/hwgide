@@ -5,7 +5,7 @@
 
 // const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://21e5329a1d62.ngrok-free.app/'  // This is the real API URL
 // const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://hexametral-noncensoriously-tashina.ngrok-free.dev'  // This is the real API URL
-const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://hexametral-noncensoriously-tashina.ngrok-free.dev/api/spotify/'  // This is the updated API URL for the MasterAPI system
+export const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://hexametral-noncensoriously-tashina.ngrok-free.dev/api/spotify/'  // This is the updated API URL for the MasterAPI system
 // const API_ENDPOINT = window.__API_ENDPOINT__ || 'https://tricklingly-panatrophic-florencia.ngrok-free.dev'
 
 export async function sendImageToApi(imageBlob) {

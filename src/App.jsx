@@ -5,7 +5,7 @@ import Player from './components/Player'
 import { PlayIcon, RemoveIcon } from './components/Icons'
 import WebcamCapture from './components/WebcamCapture'
 import buildInfo from './buildInfo'
-import { sendImageToApi, requestTrack } from './api'
+import { sendImageToApi, requestTrack, API_ENDPOINT } from './api'
 
 function App() {
   const [audioSrc, setAudioSrc] = useState(null)
@@ -736,6 +736,9 @@ function App() {
               <h1>Módify</h1>
               <p style={{ margin: 0, padding: 0, opacity: 0.4, fontSize: 12 }}>Pronounced Moodify</p>
               <h2 style={{ marginTop: 0 }}>Music from your Mood</h2>
+              <p style={{ margin: 0, padding: 0, opacity: 0.5, fontSize: 11, wordBreak: 'break-all' }}>
+                API: <a href={API_ENDPOINT} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{API_ENDPOINT}</a>
+              </p>
             </header>
             <div className="capture-card">
               <WebcamCapture ref={webcamRef} onCapture={handleCapture} disabled={loading} mood={mood} />
