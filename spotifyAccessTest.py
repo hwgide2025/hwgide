@@ -11,10 +11,10 @@ import spotdl
 import sqlite3
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from deepface import DeepFace
 import numpy as np
 import cv2
-from ngrok import ngrok
 has_mutagen = True
 try:
     from mutagen.mp3 import MP3
@@ -29,15 +29,11 @@ from urllib.parse import quote
 
 load_dotenv()
 
-domain = os.getenv('NGROK_DOMAIN', None)
-
-listener = ngrok.forward(5000, authtoken=os.getenv('NGROK_AUTH_TOKEN'), domain=domain) 
-print(f"Ingress established at {listener.url()}") 
-
 app = Flask(__name__)
+# Trust proxy headers from nginx so request.url_root reflects the public ngrok URL
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 
-
-CORS(app, origins=["http://localhost:5173", "hwgide2025.netlify.app", "https://3e9136036bb9.ngrok-free.app", "https://b8a819fefa4e.ngrok-free.app", "*"])
+CORS(app)  # allow all origins
 
 def detect_emotion_from_frame(frame):
     try:
@@ -195,7 +191,7 @@ def _download_track_and_prepare(track, search_query):
         except FileNotFoundError:
             return ({'error': "Error: 'spotdl' command not found or no mp3 produced."}, 500)
 
-    file_url = f"{listener.url()}/songs/{quote(filename)}"
+    file_url = f"{request.url_root.rstrip('/')}/songs/{quote(filename)}"
     file_mime, _ = mimetypes.guess_type(audio_path)
     file_size = None
     head_b64 = None
@@ -430,7 +426,7 @@ def get_song():
             return jsonify({'error': download_msg}), 500
     else:
         download_msg = "Skipping download since the song is already saved."
-    file_url = f"{listener.url()}/songs/{quote(filename)}"
+    file_url = f"{request.url_root.rstrip('/')}/songs/{quote(filename)}"
     file_mime, _ = mimetypes.guess_type(audio_path)
     file_size = None
     head_b64 = None
@@ -511,7 +507,7 @@ def get_song():
         }), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=False, port=5000)
+    app.run(host='127.0.0.1', debug=False, port=5000)
 
 # CLIENT_ID = os.getenv('CLIENT_ID')  # 'your_spotify_client_id'
 # CLIENT_SECRET = os.getenv('CLIENT_SECRET')  # 'your_spotify_client_secret'
